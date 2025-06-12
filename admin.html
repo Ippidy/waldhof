@@ -50,7 +50,7 @@
 
   <!-- Firebase SDKs -->
    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
   <script>
     const firebaseConfig = {
         apiKey: "AIzaSyDCX6Q4HhN8MgxSDzVdaaLsyRXbauVpH3I",
@@ -237,6 +237,8 @@
   <hr />
   <h2>KO-Runde</h2>
   <button onclick="berechneViertelfinale()">Gruppenphase beenden</button>
+  <button onclick="berechneHalbfinale()">Halbfinale ermitteln</button>
+  <button onclick="berechneFinale()">Finale ermitteln</button>
   <div id="koRunde"></div>
 
   <hr />
@@ -349,6 +351,16 @@
       });
     }
 
+    function berechneHalbfinale() {
+      // Berechnung für Halbfinale
+      // Details können hier angepasst werden
+    }
+
+    function berechneFinale() {
+      // Berechnung für Finale
+      // Details können hier angepasst werden
+    }
+
     function zeigeKORunde(spiele, titel) {
       const container = document.getElementById("koRunde");
       container.innerHTML = `<h3>${titel}</h3>`;
@@ -367,6 +379,5 @@
 
     ladeTimer();
   </script>
-  </body>
-  </html>
-
+</body>
+</html>
