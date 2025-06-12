@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin – Turnierverwaltung</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #ffffff;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .teams input {
+      width: 200px;
+      padding: 5px;
+      margin-bottom: 5px;
+      display: block;
+    }
+
+    .spiel {
+      border: 1px solid #ccc;
+      margin: 10px 0;
+      padding: 10px;
+    }
+
+    .zeit {
+      font-size: 0.9em;
+      color: #555;
+    }
+
+    .live-check {
+      float: right;
+    }
+
+    .timer {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: #f5f5f5;
+    }
+  </style>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "DEIN_API_KEY",
+      authDomain: "waldhof.firebaseapp.com",
+      databaseURL: "https://waldhof-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "waldhof",
+      storageBucket: "waldhof.appspot.com",
+      messagingSenderId: "DEINE_MESSAGING_ID",
+      appId: "DEINE_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+</head>
+<body>
+  <h1>Admin – Turnierverwaltung</h1>
+
+  <div class="teams" id="teams">
+    <h2>Teams eintragen (10 Stück)</h2>
+    <div id="teamInputs"></div>
+    <button onclick="spielplanErzeugen()">Spielplan automatisch erstellen</button>
+  </div>
+
+  <hr />
+
+  <div id="spielplan"><h2>Gruppenphase</h2></div>
+  <script>
+    let teamAnzahl = 10;
+    let teamInputs = [];
+
+    function erstelleTeamEingabe() {
+      const teamContainer = document.getElementById("teamInputs");
+      teamContainer.innerHTML = "";
+      for (let i = 0; i < teamAnzahl; i++) {
+        const input = document.createElement("input");
+        input.placeholder = "Team " + (i + 1);
+        input.id = "team_" + i;
+        teamContainer.appendChild(input);
+        teamInputs.push(input);
+      }
+    }
+
+    function ladeTeamsAusFirebase() {
+      db.ref("teams").once("value").then(snapshot => {
+        const teams = snapshot.val() || [];
+        teamInputs.forEach((input, index) => {
+          input.value = teams[index] || "";
+        });
+      });
+    }
+
+    function speichereTeamsInFirebase() {
+      const teams = teamInputs.map(input => input.value.trim());
+      db.ref("teams").set(teams);
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      erstelleTeamEingabe();
+      ladeTeamsAusFirebase();
+    });
+  </script>
+  <script>
+    let spiele = [];
+
+    function spielplanErzeugen() {
+      speichereTeamsInFirebase();
+      const teams = teamInputs.map(input => input.value.trim());
+
+      // 2 Gruppen à 5 Teams
+      const gruppeA = teams.slice(0, 5);
+      const gruppeB = teams.slice(5, 10);
+
+      spiele = [];
+
+      let zeit = new Date();
+      zeit.setHours(11, 0, 0, 0); // Start 11:00 Uhr
+
+      const pauseMinuten = 5;
+      const spielMinuten = 10;
+
+      const kombinationen = (gruppe) => {
+        const result = [];
+        for (let i = 0; i < gruppe.length; i++) {
+          for (let j = i + 1; j < gruppe.length; j++) {
+            result.push([i, j]);
+          }
+        }
+        return result;
+      };
+
+      const kombA = kombinationen(gruppeA);
+      const kombB = kombinationen(gruppeB);
+      const max = Math.max(kombA.length, kombB.length);
+
+      for (let i = 0; i < max; i++) {
+        if (kombA[i]) {
+          spiele.push({
+            g: `Gruppe A`,
+            t1: i < kombA.length ? kombA[i][0] : null,
+            t2: i < kombA.length ? kombA[i][1] : null,
+            platz: 1,
+            zeit: zeit.toISOString(),
+            g1: null,
+            g2: null
+          });
+        }
+        if (kombB[i]) {
+          spiele.push({
+            g: `Gruppe B`,
+            t1: i < kombB.length ? kombB[i][0] + 5 : null,
+            t2: i < kombB.length ? kombB[i][1] + 5 : null,
+            platz: 2,
+            zeit: zeit.toISOString(),
+            g1: null,
+            g2: null
+          });
+        }
+        zeit = new Date(zeit.getTime() + (spielMinuten + pauseMinuten) * 60000);
+      }
+
+      db.ref("spiele").set(spiele);
+      zeigeSpiele();
+    }
+
+    function zeigeSpiele() {
+      const container = document.getElementById("spielplan");
+      container.innerHTML = "<h2>Gruppenphase</h2>";
+
+      spiele.forEach((spiel, index) => {
+        const div = document.createElement("div");
+        div.className = "spiel";
+
+        const t1 = teamInputs[spiel.t1]?.value || `Team ${spiel.t1 + 1}`;
+        const t2 = teamInputs[spiel.t2]?.value || `Team ${spiel.t2 + 1}`;
+        const g1 = spiel.g1 ?? "-";
+        const g2 = spiel.g2 ?? "-";
+
+        const zeit = new Date(spiel.zeit).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        div.innerHTML = `
+          <strong>${spiel.g}</strong> – ${zeit} – Platz ${spiel.platz}<br>
+          <button onclick="spielMinus(${index}, 'g1')">−</button>
+          <span>${t1} (${g1})</span> vs
+          <span>(${g2}) ${t2}</span>
+          <button onclick="spielPlus(${index}, 'g2')">+</button>
+          <label class="live-check">
+            <input type="checkbox" onchange="aktualisiereLive(${index})" />
+            Live
+          </label>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function spielPlus(index, feld) {
+      spiele[index][feld] = (spiele[index][feld] ?? 0) + 1;
+      db.ref("spiele").set(spiele);
+      zeigeSpiele();
+    }
+
+    function spielMinus(index, feld) {
+      spiele[index][feld] = Math.max(0, (spiele[index][feld] ?? 0) - 1);
+      db.ref("spiele").set(spiele);
+      zeigeSpiele();
+    }
+
+    function aktualisiereLive(index) {
+      spiele[index].live = !spiele[index].live;
+      db.ref("spiele").set(spiele);
+    }
+
+    function ladeSpiele() {
+      db.ref("spiele").on("value", snapshot => {
+        spiele = snapshot.val() || [];
+        zeigeSpiele();
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      ladeSpiele();
+    });
+  </script>
+  <hr />
+  <h2>KO-Runde</h2>
+  <button onclick="berechneViertelfinale()">Gruppenphase beenden</button>
+  <div id="koRunde"></div>
+
+  <hr />
+  <h2>Navigation</h2>
+  <a href="live.html" target="_blank">Live-Anzeige</a> |
+  <a href="tabelle.html" target="_blank">Tabelle</a> |
+  <a href="übersicht.html" target="_blank">Übersicht</a> |
+  <a href="viertelfinale.html" target="_blank">Viertelfinale</a>
+  <br><br>
+  <button onclick="resetFirebase()">Speicher leeren</button>
+
+  <div class="timer">
+    <h3>Stoppuhr</h3>
+    <div id="timerAnzeige">00:00</div>
+    <button onclick="startTimer()">Start</button>
+    <button onclick="pauseTimer()">Pause</button>
+    <button onclick="resetTimer()">Zurücksetzen</button>
+  </div>
+
+  <script>
+    let timerSekunden = 0;
+    let timerInterval = null;
+
+    function updateTimerAnzeige() {
+      const min = String(Math.floor(timerSekunden / 60)).padStart(2, "0");
+      const sec = String(timerSekunden % 60).padStart(2, "0");
+      document.getElementById("timerAnzeige").textContent = `${min}:${sec}`;
+    }
+
+    function startTimer() {
+      if (!timerInterval) {
+        timerInterval = setInterval(() => {
+          timerSekunden++;
+          db.ref("stoppuhr/sekunden").set(timerSekunden);
+          updateTimerAnzeige();
+        }, 1000);
+      }
+    }
+
+    function pauseTimer() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      timerSekunden = 0;
+      db.ref("stoppuhr/sekunden").set(0);
+      updateTimerAnzeige();
+    }
+
+    function ladeTimer() {
+      db.ref("stoppuhr/sekunden").on("value", snapshot => {
+        const sek = snapshot.val();
+        if (sek != null) {
+          timerSekunden = sek;
+          updateTimerAnzeige();
+        }
+      });
+    }
+
+    function resetFirebase() {
+      if (confirm("Wirklich alle Daten löschen?")) {
+        db.ref().set({});
+        location.reload();
+      }
+    }
+
+    function berechneViertelfinale() {
+      db.ref("teams").once("value").then(teamSnap => {
+        db.ref("spiele").once("value").then(spielSnap => {
+          const teams = teamSnap.val() || [];
+          const spiele = spielSnap.val() || [];
+
+          const punkte = Array(10).fill(0);
+          const tore = Array(10).fill(0);
+          const gegentore = Array(10).fill(0);
+
+          spiele.forEach(spiel => {
+            const { t1, t2, g1, g2 } = spiel;
+            if (t1 != null && t2 != null && g1 != null && g2 != null) {
+              tore[t1] += g1;
+              tore[t2] += g2;
+              gegentore[t1] += g2;
+              gegentore[t2] += g1;
+              if (g1 > g2) punkte[t1] += 3;
+              else if (g1 < g2) punkte[t2] += 3;
+              else { punkte[t1]++; punkte[t2]++; }
+            }
+          });
+
+          const gruppeA = [0,1,2,3,4].map(i => ({
+            id: i, name: teams[i], punkte: punkte[i], diff: tore[i]-gegentore[i]
+          })).sort((a,b) => b.punkte - a.punkte || b.diff - a.diff);
+
+          const gruppeB = [5,6,7,8,9].map(i => ({
+            id: i, name: teams[i], punkte: punkte[i], diff: tore[i]-gegentore[i]
+          })).sort((a,b) => b.punkte - a.punkte || b.diff - a.diff);
+
+          const viertel = [
+            { name: "VF1", t1: gruppeA[0].id, t2: gruppeB[3].id },
+            { name: "VF2", t1: gruppeA[1].id, t2: gruppeB[2].id },
+            { name: "VF3", t1: gruppeB[0].id, t2: gruppeA[3].id },
+            { name: "VF4", t1: gruppeB[1].id, t2: gruppeA[2].id }
+          ];
+
+          db.ref("viertelfinale").set(viertel);
+          zeigeKORunde(viertel, "Viertelfinale");
+        });
+      });
+    }
+
+    function zeigeKORunde(spiele, titel) {
+      const container = document.getElementById("koRunde");
+      container.innerHTML = `<h3>${titel}</h3>`;
+      db.ref("teams").once("value").then(snap => {
+        const teams = snap.val() || [];
+        spiele.forEach(spiel => {
+          const div = document.createElement("div");
+          div.className = "spiel";
+          const t1 = teams[spiel.t1] || `Team ${spiel.t1+1}`;
+          const t2 = teams[spiel.t2] || `Team ${spiel.t2+1}`;
+          div.innerHTML = `<strong>${spiel.name}</strong>: ${t1} vs ${t2}`;
+          container.appendChild(div);
+        });
+      });
+    }
+
+    ladeTimer();
+  </script>
+  </body>
+  </html>
+

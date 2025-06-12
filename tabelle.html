@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tabelle Gruppenphase</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: sans-serif;
+      color: white;
+      background: linear-gradient(135deg, #306030, #002800);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .tabellen {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    table {
+      border: 2px solid white;
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 500px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    th, td {
+      border: 1px solid white;
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    caption {
+      margin-bottom: 10px;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDCX6Q4HhN8MgxSDzVdaaLsyRXbauVpH3I",
+        authDomain: "waldhof.firebaseapp.com",
+        databaseURL: "waldhof-18572.firebaseapp.com",
+        projectId: "waldhof-18572",
+        storageBucket: "waldhof-18572.firebasestorage.app",
+        messagingSenderId: "208519351730",
+        appId: "1:208519351730:web:e599af71e71821e5c828ab"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+</head>
+<body>
+  <h1>Tabelle Gruppenphase</h1>
+  <div class="tabellen" id="tabellenContainer"></div>
+
+  <script>
+    function berechneTabellen(teams, spiele) {
+      const daten = teams.map((name, index) => ({
+        index,
+        name,
+        gruppe: index < 5 ? "A" : "B",
+        siege: 0,
+        niederlagen: 0,
+        unentschieden: 0,
+        punkte: 0,
+        tore: 0,
+        gegentore: 0,
+      }));
+
+      spiele.forEach(s => {
+        if (s.g1 != null && s.g2 != null && s.t1 != null && s.t2 != null) {
+          const a = daten[s.t1];
+          const b = daten[s.t2];
+          a.tore += s.g1;
+          b.tore += s.g2;
+          a.gegentore += s.g2;
+          b.gegentore += s.g1;
+
+          if (s.g1 > s.g2) { a.siege++; b.niederlagen++; a.punkte += 3; }
+          else if (s.g1 < s.g2) { b.siege++; a.niederlagen++; b.punkte += 3; }
+          else { a.unentschieden++; b.unentschieden++; a.punkte++; b.punkte++; }
+        }
+      });
+
+      const gruppen = { A: [], B: [] };
+      daten.forEach(d => gruppen[d.gruppe].push(d));
+
+      for (const g of ["A", "B"]) {
+        gruppen[g].sort((a, b) =>
+          b.punkte - a.punkte ||
+          (b.tore - b.gegentore) - (a.tore - a.gegentore)
+        );
+      }
+
+      return gruppen;
+    }
+
+    function zeigeTabellen(gruppen) {
+      const container = document.getElementById("tabellenContainer");
+      container.innerHTML = "";
+
+      for (const g of ["A", "B"]) {
+        const tabelle = document.createElement("table");
+        tabelle.innerHTML = `
+          <caption>Gruppe ${g}</caption>
+          <tr>
+            <th>Platz</th>
+            <th>Team</th>
+            <th>Sp.</th>
+            <th>🏆</th>
+            <th>➖</th>
+            <th>=</th>
+            <th>⚽</th>
+            <th>🥅</th>
+            <th>Diff</th>
+            <th>Pts</th>
+          </tr>
+        `;
+        gruppen[g].forEach((t, i) => {
+          const spiele = t.siege + t.niederlagen + t.unentschieden;
+          const diff = t.tore - t.gegentore;
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${t.name}</td>
+            <td>${spiele}</td>
+            <td>${t.siege}</td>
+            <td>${t.niederlagen}</td>
+            <td>${t.unentschieden}</td>
+            <td>${t.tore}</td>
+            <td>${t.gegentore}</td>
+            <td>${diff}</td>
+            <td>${t.punkte}</td>
+          `;
+          tabelle.appendChild(row);
+        });
+        container.appendChild(tabelle);
+      }
+    }
+
+    function ladeDaten() {
+      let teams = [];
+      let spiele = [];
+
+      db.ref("teams").on("value", snap => {
+        teams = snap.val() || [];
+        if (spiele.length) zeigeTabellen(berechneTabellen(teams, spiele));
+      });
+
+      db.ref("spiele").on("value", snap => {
+        spiele = snap.val() || [];
+        if (teams.length) zeigeTabellen(berechneTabellen(teams, spiele));
+      });
+    }
+
+    ladeDaten();
+  </script>
+</body>
+</html>
+

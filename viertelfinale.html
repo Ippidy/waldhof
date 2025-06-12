@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Turnierbaum</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: sans-serif;
+      color: white;
+      background: linear-gradient(135deg, #306030, #002800);
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 40px;
+    }
+
+    .baum {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+    }
+
+    .runde {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+
+    .spiel {
+      border: 2px solid white;
+      padding: 15px;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .info {
+      font-size: 0.9em;
+      color: #ccc;
+      margin-bottom: 8px;
+    }
+
+    .spiel strong {
+      font-size: 1.3em;
+    }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDCX6Q4HhN8MgxSDzVdaaLsyRXbauVpH3I",
+        authDomain: "waldhof.firebaseapp.com",
+        databaseURL: "waldhof-18572.firebaseapp.com",
+        projectId: "waldhof-18572",
+        storageBucket: "waldhof-18572.firebasestorage.app",
+        messagingSenderId: "208519351730",
+        appId: "1:208519351730:web:e599af71e71821e5c828ab"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+</head>
+<body>
+  <h1>KO-Phase – Turnierbaum</h1>
+  <div class="baum">
+    <div class="runde" id="viertelfinale"></div>
+    <div class="runde" id="halbfinale"></div>
+    <div class="runde" id="finale"></div>
+  </div>
+
+  <script>
+    let teams = [];
+
+    function ladeTeamsUndSpiele() {
+      db.ref("teams").once("value").then(ts => {
+        teams = ts.val() || [];
+        ladeKO("viertelfinale", "Viertelfinale");
+        ladeKO("halbfinale", "Halbfinale");
+        ladeKO("finale", "Finale");
+      });
+    }
+
+    function ladeKO(pfad, label) {
+      db.ref(pfad).on("value", snap => {
+        const liste = snap.val() || [];
+        const container = document.getElementById(pfad);
+        container.innerHTML = "";
+
+        liste.forEach((spiel, i) => {
+          const t1 = typeof spiel.t1 === "number" ? teams[spiel.t1] || `Team ${spiel.t1+1}` : (spiel.t1 || "—");
+          const t2 = typeof spiel.t2 === "number" ? teams[spiel.t2] || `Team ${spiel.t2+1}` : (spiel.t2 || "—");
+          const g1 = spiel.g1 ?? "-";
+          const g2 = spiel.g2 ?? "-";
+
+          const div = document.createElement("div");
+          div.className = "spiel";
+          div.innerHTML = `
+            <div class="info">${label} ${i + 1}</div>
+            <strong>${t1} ${g1} : ${g2} ${t2}</strong>
+          `;
+          container.appendChild(div);
+        });
+      });
+    }
+
+    ladeTeamsUndSpiele();
+  </script>
+</body>
+</html>
