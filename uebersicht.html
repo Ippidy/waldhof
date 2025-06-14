@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Übersicht – Turnier</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #ffffff;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    .spiel {
+      border: 1px solid #ccc;
+      margin: 5px 0;
+      padding: 10px;
+    }
+    .button-bar {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .button-bar button {
+      margin: 0 10px;
+      padding: 10px 15px;
+      font-size: 16px;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDCX6Q4HhN8MgxSDzVdaaLsyRXbauVpH3I",
+      authDomain: "waldhof.firebaseapp.com",
+      databaseURL: "https://waldhof-18572-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "waldhof-18572",
+      storageBucket: "waldhof-18572.appspot.com",
+      messagingSenderId: "208519351730",
+      appId: "1:208519351730:web:e599af71e71821e5c828ab"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+</head>
+<body>
+  <h1>Spielübersicht</h1>
+
+  <div class="button-bar">
+    <button onclick="location.href='live.html'">Livespiele anzeigen</button>
+    <button onclick="location.href='tabelle.html'">Tabelle anzeigen</button>
+  </div>
+
+  <div id="spieleContainer"></div>
+
+  <script>
+    const phasenReihenfolge = [
+      "Gruppenphase", "Platzierungsspiele", "Halbfinale", "Finale", "Spiel um Platz 3"
+    ];
+
+    function ladeSpiele() {
+      db.ref("teams").once("value").then(teamSnap => {
+        const teams = teamSnap.val() || [];
+        db.ref("spiele").once("value").then(snapshot => {
+          const spiele = snapshot.val() || [];
+          const container = document.getElementById("spieleContainer");
+          container.innerHTML = "";
+
+          phasenReihenfolge.forEach(phase => {
+            const phaseSpiele = spiele.filter(sp => sp.phase === phase);
+            if (phaseSpiele.length === 0) return;
+
+            const h2 = document.createElement("h2");
+            h2.textContent = phase;
+            container.appendChild(h2);
+
+            phaseSpiele.forEach(spiel => {
+              const div = document.createElement("div");
+              div.className = "spiel";
+
+              const t1 = teams[spiel.t1] || `Team ${spiel.t1 + 1}`;
+              const t2 = teams[spiel.t2] || `Team ${spiel.t2 + 1}`;
+              const zeit = new Date(spiel.zeit).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const platz = spiel.platz ?? "-";
+              const bezeichnung = phase === "Gruppenphase" ? `Gruppe ${spiel.gruppe}` : (spiel.name || phase);
+
+              div.innerHTML = `
+                <strong>${bezeichnung}</strong> – ${zeit} – Platz ${platz}<br>
+                ${t1} vs ${t2}
+              `;
+              container.appendChild(div);
+            });
+          });
+        });
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", ladeSpiele);
+  </script>
+</body>
+</html>
+
