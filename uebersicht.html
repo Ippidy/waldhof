@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Übersicht – Turnier</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #ffffff;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2 {
+      margin-top: 0;
+    }
+    .spiel {
+      border: 1px solid #ccc;
+      margin: 10px 0;
+      padding: 10px;
+    }
+    .buttons {
+      margin-bottom: 20px;
+    }
+    .buttons a {
+      display: inline-block;
+      margin-right: 10px;
+      padding: 10px 15px;
+      background: #007b7f;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+  </style>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDCX6Q4HhN8MgxSDzVdaaLsyRXbauVpH3I",
+      authDomain: "waldhof.firebaseapp.com",
+      databaseURL: "https://waldhof-18572-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "waldhof-18572",
+      storageBucket: "waldhof-18572.appspot.com",
+      messagingSenderId: "208519351730",
+      appId: "1:208519351730:web:e599af71e71821e5c828ab"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+</head>
+<body>
+  <h1>Übersicht – Turnierverlauf</h1>
+
+  <div class="buttons">
+    <a href="live.html" target="_blank">Live Spiele</a>
+    <a href="tabelle.html" target="_blank">Tabelle</a>
+  </div>
+
+  <div id="spieleContainer"></div>
+
+  <script>
+    function ladeSpieleUndTeams() {
+      db.ref("teams").once("value").then(teamSnap => {
+        const teams = teamSnap.val() || [];
+
+        db.ref("spiele").once("value").then(snapshot => {
+          const spiele = snapshot.val() || [];
+
+          const container = document.getElementById("spieleContainer");
+          container.innerHTML = "";
+
+          const phasen = [
+            "Gruppenphase",
+            "Platzierungsspiele",
+            "Halbfinale",
+            "Finale",
+            "Spiel um Platz 3"
+          ];
+
+          phasen.forEach(phase => {
+            const gruppierteSpiele = spiele.filter(sp => sp.phase === phase);
+            if (gruppierteSpiele.length > 0) {
+              const h2 = document.createElement("h2");
+              h2.textContent = phase;
+              container.appendChild(h2);
+
+              gruppierteSpiele.forEach(spiel => {
+                const div = document.createElement("div");
+                div.className = "spiel";
+
+                const t1 = teams[spiel.t1] || `Team ${spiel.t1 + 1}`;
+                const t2 = teams[spiel.t2] || `Team ${spiel.t2 + 1}`;
+                const g1 = spiel.g1 ?? "-";
+                const g2 = spiel.g2 ?? "-";
+                const zeit = new Date(spiel.zeit).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                const bezeichnung = spiel.phase === "Gruppenphase"
+                  ? `Gruppe ${spiel.gruppe}`
+                  : (spiel.name || spiel.phase);
+
+                div.innerHTML = `
+                  <strong>${bezeichnung}</strong> – ${zeit} – Platz ${spiel.platz}<br>
+                  ${t1} (${g1}) vs (${g2}) ${t2}
+                `;
+                container.appendChild(div);
+              });
+            }
+          });
+        });
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", ladeSpieleUndTeams);
+  </script>
+</body>
+</html>
+
